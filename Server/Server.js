@@ -1,49 +1,27 @@
 const express = require("express");
-const { OAuth2Client } = require("google-auth-library");
-const jwt = require("jsonwebtoken");
-const cors = require("cors");
-const { WebSocketServer } = require("ws");
+const fs = require("fs");
+const path = require("path");
+const http = require("http"); // Import HTTP module to create the server
+const { WebSocketServer } = require("ws"); // Import WebSocketServer
 
 const app = express();
-app.use(express.json());
+app.use(express.static("public")); // Serve static files from public directory
 
-const allowedOrigins = [
-    "http://localhost:5173",
-    "http://localhost:5173/",
-    "http://localhost:5174",
-    "http://localhost:5174/",
-];
-const corsOptions = {
-    origin: (origin, callback) => {
-        if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
-            callback(null, true);
-        } else {
-            callback(new Error(`Not allowed by CORS, origin: ${origin}`));
-        }
-    },
-    optionsSuccessStatus: 200,
-};
-const credentials = (req, res, next) => {
-    const origin = req.headers.origin;
-    if (allowedOrigins.includes(origin)) {
-        res.header("Access-Control-Allow-Credentials", true);
-    }
-    next();
-};
-require("dotenv").config();
+// Video streaming route
+app.get("/", (req, res) => {
+    res.sendFile("hi");
+});
 
-app.use(credentials);
-app.use(cors(corsOptions));
-app.use(express.urlencoded({ extended: true }));
+// Create an HTTP server
+const server = http.createServer(app);
 
-//Add WebSocket server
-const server = require("http").createServer(app);
+// Initialize WebSocketServer
 const wss = new WebSocketServer({ server });
 
 wss.on("connection", (ws) => {
     console.log("New WebSocket connection");
 
-    // Handle incoming messages
+    // Handle incoming WebSocket messages
     ws.on("message", (message) => {
         console.log(`Received message: ${message}`);
         ws.send(`You said: ${message}`);
@@ -57,5 +35,8 @@ wss.on("connection", (ws) => {
     });
 });
 
-const PORT = 5000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// Start the HTTP server on a specific port
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});
