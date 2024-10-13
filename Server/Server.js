@@ -1,62 +1,80 @@
 const express = require("express");
 const http = require("http");
-const { WebSocketServer } = require("ws"); // WebSocket Server from the ws library
-const path = require("path");
-
+const { WebSocketServer } = require("ws");
 const app = express();
 
-// Serve the frontend (React app) from the "public" directory
-app.use(express.static(path.join(__dirname, "public")));
+// Serve static files (for frontend)
+app.use(express.static("public"));
 
-app.get("/", (req, res) => {
-    res.sendFile(path.join(__dirname, "public", "index.html"));
-});
-
-// Create an HTTP server
 const server = http.createServer(app);
-
-// Initialize WebSocket server
 const wss = new WebSocketServer({ server });
 
-let clients = [];
+const users = new Map(); // Store user connections
 
-// Handle WebSocket connections
+// Function to broadcast a message to all clients
+const broadcast = (data) => {
+    wss.clients.forEach((client) => {
+        if (client.readyState === client.OPEN) {
+            client.send(JSON.stringify(data));
+        }
+    });
+};
+
 wss.on("connection", (ws) => {
-    console.log("New WebSocket connection");
+    console.log("New WebSocket connection established");
 
-    // Add the new client to the list of clients
-    clients.push(ws);
-
-    // Send a welcome message to the new client
-    ws.send("Welcome to the WebSocket server!");
-
-    // Handle incoming messages from clients
+    // Handle incoming messages
     ws.on("message", (message) => {
-        console.log(`Received message: ${message}`);
+        const parsedData = JSON.parse(message);
 
-        // Broadcast the message to all connected clients
-        clients.forEach((client) => {
-            if (client.readyState === ws.OPEN) {
-                client.send(`Client says: ${message}`);
+        switch (parsedData.type) {
+            case "message":
+                // Broadcast message to all clients
+                broadcast({
+                    type: "message",
+                    user: parsedData.user,
+                    content: parsedData.content,
+                });
+                break;
+
+            case "notification":
+                // Broadcast notification to all clients
+                broadcast({
+                    type: "notification",
+                    notification: parsedData.notification,
+                });
+                break;
+
+            case "register":
+                // Register a user (for personal notifications)
+                users.set(parsedData.userId, ws);
+                break;
+
+            default:
+                console.log("Unknown message type");
+        }
+    });
+
+    // Handle connection close
+    ws.on("close", () => {
+        console.log("Client disconnected");
+        users.forEach((clientWs, userId) => {
+            if (clientWs === ws) {
+                users.delete(userId);
             }
         });
     });
 
-    // Handle client disconnection
-    ws.on("close", () => {
-        console.log("Client disconnected");
-        // Remove the disconnected client from the list of clients
-        clients = clients.filter((client) => client !== ws);
-    });
-
-    // Handle errors
-    ws.on("error", (error) => {
-        console.error("WebSocket error:", error);
-    });
+    // Send welcome message
+    ws.send(
+        JSON.stringify({
+            type: "message",
+            user: "Server",
+            content: "Welcome to the WebSocket server!",
+        })
+    );
 });
 
-// Start the server
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+server.listen(5000, () => {
+    console.log("Server running on port 5000");
 });
