@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Chat App</title>
+        <script src="/socket.io/socket.io.js"></script>
+    </head>
+    <body>
+        <h1>Chat App</h1>
+        <div id="messages"></div>
+        <input
+            type="text"
+            id="messageInput"
+            placeholder="Type a message..."
+            oninput="typingStatus(true)"
+            onblur="typingStatus(false)"
+        />
+        <button onclick="sendMessage()">Send</button>
+
+        <div id="typingStatus"></div>
+
+        <script>
+            const socket = io("http://localhost:3000");
+            const chatRoomId = 1; // Example chat room
+            const senderId = 1; // Replace with actual user ID
+            const receiverId = 2; // Replace with actual receiver ID
+
+            socket.emit("joinRoom", chatRoomId);
+
+            // Send message
+            function sendMessage() {
+                const content = document.getElementById("messageInput").value;
+                socket.emit("sendMessage", {
+                    senderId,
+                    receiverId,
+                    chatRoomId,
+                    content,
+                });
+            }
+
+            // Listen for received messages
+            socket.on("receiveMessage", (message) => {
+                const messagesDiv = document.getElementById("messages");
+                const messageElement = document.createElement("p");
+                messageElement.textContent = `${message.senderId}: ${message.content}`;
+                messagesDiv.appendChild(messageElement);
+            });
+
+            // Typing status
+            function typingStatus(typing) {
+                socket.emit("typing", { chatRoomId, typing });
+            }
+
+            socket.on("typingStatus", ({ typing }) => {
+                document.getElementById("typingStatus").textContent = typing
+                    ? "User is typing..."
+                    : "";
+            });
+
+            // Mark message as read when displayed
+            function markMessageAsRead(messageId) {
+                socket.emit("markAsRead", { messageId, chatRoomId });
+            }
+
+            socket.on("messageRead", ({ messageId }) => {
+                console.log(`Message ${messageId} marked as read`);
+            });
+        </script>
+    </body>
+</html>
