@@ -2,36 +2,39 @@
 require("dotenv").config();
 const express = require("express");
 const http = require("http");
+const cors = require("cors"); // Import the CORS middleware
+const path = require("path");
 const { Server } = require("socket.io");
 const sequelize = require("./config/database");
-const User = require("./models/User");
-const Message = require("./models/Message");
-const ChatRoom = require("./models/ChatRoom");
 const authRoutes = require("./routes/authRoutes");
 const chatRoomRoutes = require("./routes/chatRoomRoutes");
 
-const path = require("path");
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: { origin: "*" },
 });
 
+// Middleware
+app.use(cors({ origin: "http://localhost:5175" })); // Allow requests from React frontend
 app.use(express.json());
+
+// Routes
 app.use("/auth", authRoutes);
 app.use("/chat-room", chatRoomRoutes);
+
+// Serve static files from the 'public' directory
+app.use("/", express.static(path.join(__dirname, "/public")));
 
 // Real-time chat with Socket.IO
 io.on("connection", (socket) => {
     console.log("New client connected");
 
-    // Join a chat room
     socket.on("joinRoom", (chatRoomId) => {
         socket.join(chatRoomId);
         console.log(`User joined chat room: ${chatRoomId}`);
     });
 
-    // Handle sending messages
     socket.on(
         "sendMessage",
         async ({ senderId, receiverId, chatRoomId, content }) => {
@@ -41,24 +44,19 @@ io.on("connection", (socket) => {
                 chatRoomId,
                 content,
             });
-
             io.to(chatRoomId).emit("receiveMessage", message);
         }
     );
 
-    // Mark messages as read
     socket.on("markAsRead", async ({ messageId, chatRoomId }) => {
         const message = await Message.findByPk(messageId);
         if (message) {
             message.read = true;
             await message.save();
-
-            // Notify users in the room
             io.to(chatRoomId).emit("messageRead", { messageId });
         }
     });
 
-    // Typing status
     socket.on("typing", ({ chatRoomId, typing }) => {
         socket.to(chatRoomId).emit("typingStatus", { typing });
     });
@@ -67,8 +65,6 @@ io.on("connection", (socket) => {
         console.log("Client disconnected");
     });
 });
-
-app.use("/", express.static(path.join(__dirname, "/public")));
 
 const initializeDatabase = async () => {
     try {
@@ -80,6 +76,6 @@ const initializeDatabase = async () => {
 };
 initializeDatabase();
 
-server.listen(3005, () =>
-    console.log("Server is running on http://localhost:3000")
-);
+server.listen(3005, () => {
+    console.log("Server is running on http://localhost:3005");
+});
