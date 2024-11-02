@@ -10,6 +10,7 @@ const ChatRoom = require("./models/ChatRoom");
 const authRoutes = require("./routes/authRoutes");
 const chatRoomRoutes = require("./routes/chatRoomRoutes");
 
+const path = require("path");
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -66,9 +67,12 @@ io.on("connection", (socket) => {
         console.log("Client disconnected");
     });
 });
+
+app.use("/", express.static(path.join(__dirname, "/public")));
+
 const initializeDatabase = async () => {
     try {
-        await sequelize.sync({ force: false });
+        await sequelize.sync({ force: true });
         console.log("Database synchronized");
     } catch (error) {
         console.error("Failed to synchronize database:", error);
